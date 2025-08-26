@@ -83,15 +83,14 @@ init python:
     def _neuro_can_load():
         return renpy.can_load(renpy.newest_slot())
 
-    def _neuro_load():
-        renpy.log(renpy.newest_slot())
-        if renpy.can_load(renpy.newest_slot()):
+    def _neuro_load(force_new_game=False):
+        if renpy.can_load(renpy.newest_slot() and not force_new_game):
             # Load the last saved state
             neuro_give_context("Loading your last saved state. You will start off where you left off.", silent=True)
             renpy.load(renpy.newest_slot())
             neuro_give_context("Loading your last saved state failed. Starting a new game instead.", silent=True)
             renpy.log("[NEURO] Failed to load the last saved state: {}".format(str(e)))
-        # Start a new game if no save was found
+        # Start a new game if no save was found or force_new_game is True
         renpy.jump_out_of_context("start")
 
 
@@ -342,12 +341,31 @@ init python:
             renpy.hide("_neuro_delayed_function_screen")
         except:
             pass
-        # Auto-start the game if the main menu is loaded and auto_start is enabled
-        if "main_menu" in name and neuroconfig.auto_start:
-            _neuro_delayed_function(
-                5.0,
-                _neuro_load
-            )
+        if "main_menu" in name:
+            if store._neuro_game_started:
+                # Game has just ended, start a new game or close the game window depending on the game_over_action config
+                if neuroconfig.game_over_action == "new_game":
+                    neuro_give_context("The game is over. Starting a new game.", silent=True)
+                    _neuro_delayed_function(
+                        5.0,
+                        _neuro_load,
+                        True
+                    )
+                elif neuroconfig.game_over_action == "close":
+                    neuro_give_context("The game is over. Closing the game window.", silent=True)
+                    _neuro_delayed_function(
+                        5.0,
+                        renpy.quit
+                    )
+            else:
+                # Auto-start the game if the main menu is loaded and auto_start is enabled
+                if neuroconfig.auto_start:
+                    _neuro_delayed_function(
+                        5.0,
+                        _neuro_load
+                    )
+            store._neuro_game_started = False
+            
         # Set the game started flag if the label is "start"
         if "start" in name:
             store._neuro_game_started = True
