@@ -107,7 +107,7 @@ init python:
                 "silent": silent
             }
         }
-        _neuro_ws.send(json.dumps(msg))
+        _neuro_send_ws_message(json.dumps(msg))
 
 
     ### ACTIONS ###
@@ -132,7 +132,7 @@ init python:
                 ]
             }
         }
-        _neuro_ws.send(json.dumps(msg))
+        _neuro_send_ws_message(json.dumps(msg))
 
     def neuro_unregister_action(action_name):
         renpy.log("[NEURO] Unregistering action: {}".format(action_name))
@@ -144,7 +144,7 @@ init python:
                 "action_names": [action_name]
             }
         }
-        _neuro_ws.send(json.dumps(msg))
+        _neuro_send_ws_message(json.dumps(msg))
 
     def neuro_unregister_all_actions():
         if len(_neuro_registered_actions) == 0:
@@ -157,7 +157,7 @@ init python:
                 "action_names": [action["name"] for action in _neuro_registered_actions]
             }
         }
-        _neuro_ws.send(json.dumps(msg))
+        _neuro_send_ws_message(json.dumps(msg))
 
     def neuro_force_action(action_names, query):
         renpy.log("[NEURO] Forcing actions: {}".format(action_names))
@@ -169,7 +169,7 @@ init python:
                 "action_names": action_names
             }
         }
-        _neuro_ws.send(json.dumps(msg))
+        _neuro_send_ws_message(json.dumps(msg))
 
     def _neuro_handle_progress_dialogue_action(data):
         renpy.exports.queue_event("dismiss")
@@ -277,10 +277,19 @@ init python:
                 "message": message
             }
         }
-        _neuro_ws.send(json.dumps(msg))
+        _neuro_send_ws_message(json.dumps(msg))
 
 
     ### WEBSOCKET CONNECTION ###
+
+    def _neuro_send_ws_message(message, ws=None):
+        if ws is None:
+            ws = _neuro_ws
+        if ws and ws.sock and ws.sock.connected:
+            ws.send(message)
+            return True
+        else:
+            return False
 
     def _neuro_ws_on_open(ws):
         renpy.log("[NEURO] WebSocket connection opened")
@@ -290,10 +299,21 @@ init python:
             "command": "startup",
             "game": _neuro_get_game_name(),
         }
-        ws.send(json.dumps(msg))
+        _neuro_send_ws_message(json.dumps(msg), ws)
 
         # Give initial context of the game
         neuro_give_context("You are now playing the visual novel '{}'.".format(_neuro_get_game_name()), silent=False)
+
+        # Register all currently registered actions
+        if len(_neuro_registered_actions) > 0:
+            msg = {
+                "command": "actions/register",
+                "game": _neuro_get_game_name(),
+                "data": {
+                    "actions": _neuro_registered_actions
+                }
+            }
+            _neuro_send_ws_message(json.dumps(msg), ws)
 
     def _neuro_ws_on_message(ws, message):
         renpy.log("[NEURO] Message received: " + message)
@@ -310,7 +330,7 @@ init python:
                     "actions": _neuro_registered_actions
                 }
             }
-            ws.send(json.dumps(msg))
+            _neuro_send_ws_message(json.dumps(msg), ws)
 
     def _neuro_ws_on_error(ws, error):
         renpy.log("[NEURO] Error occurred:", error)
@@ -320,14 +340,16 @@ init python:
 
     def _neuro_ws_run():
         global _neuro_ws
-        _neuro_ws = websocket.WebSocketApp(
-            neuroconfig.ws_url,
-            on_open=_neuro_ws_on_open,
-            on_message=_neuro_ws_on_message,
-            on_error=_neuro_ws_on_error,
-            on_close=_neuro_ws_on_close
-        )
-        _neuro_ws.run_forever()
+        while True:
+            _neuro_ws = websocket.WebSocketApp(
+                neuroconfig.ws_url,
+                on_open=_neuro_ws_on_open,
+                on_message=_neuro_ws_on_message,
+                on_error=_neuro_ws_on_error,
+                on_close=_neuro_ws_on_close
+            )
+            _neuro_ws.run_forever()
+            time.sleep(1) # Wait before trying to reconnect
     renpy.invoke_in_thread(_neuro_ws_run)
 
 
