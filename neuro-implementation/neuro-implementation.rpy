@@ -15,6 +15,25 @@ init python:
 
     renpy.log("[NEURO] Initializing Neuro Implementation...")
 
+    # We need hmac.py and ssl.py for websocket-client to work in older Ren'Py versions which use Python 2.x
+    # However, these break under Python 3.x, so we need to remove them if we're running under Python 3.x
+    import sys
+    import os
+    game_dir = os.path.join(config.basedir, "game")
+    if sys.version_info[0] > 2:
+        hmac_path = os.path.join(game_dir, "hmac.py")
+        ssl_path = os.path.join(game_dir, "ssl.py")
+        deleted = False
+        if os.path.exists(hmac_path):
+            os.remove(hmac_path)
+            deleted = True
+        if os.path.exists(ssl_path):
+            os.remove(ssl_path)
+            deleted = True
+        if deleted:
+            renpy.log("[NEURO] Removed hmac.py and/or ssl.py to ensure compatibility with Python 3.x, restarting the game...")
+            renpy.quit(relaunch=True)     
+
     import websocket
     import json
     import time
