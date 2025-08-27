@@ -84,7 +84,7 @@ init python:
         return renpy.can_load(renpy.newest_slot())
 
     def _neuro_load(force_new_game=False):
-        if renpy.can_load(renpy.newest_slot() and not force_new_game):
+        if renpy.can_load(renpy.newest_slot()) and not force_new_game:
             # Load the last saved state
             neuro_give_context("Loading your last saved state. You will start off where you left off.", silent=True)
             renpy.load(renpy.newest_slot())
@@ -209,29 +209,42 @@ init python:
         return (success, message)
 
     def _neuro_click_button(button_txt):
-        button = next((b for b in _neuro_screen_buttons if _neuro_get_displayable_text(b) == button_txt), None)
+        global _neuro_ui_buttons
+        button = next((b for b in _neuro_ui_buttons if _neuro_get_displayable_text(b) == button_txt), None)
         actions = button.action
+        if button.action is None:
+            actions = button.clicked
         if not isinstance(actions, (list, tuple)):
             actions = [actions]
         for action in actions:
+            neuro_give_context(str(action))
             if action.__class__.__name__ == "Return":
                 value = getattr(action, "value", None)
                 renpy.show_screen("_neuro_return_screen", value)
-            else:
-                action()
+                _neuro_ui_buttons = []
+                continue
+            if action.__class__.__name__ == "Curry":
+                neuro_give_context("Curry action detected.")
+                fn = getattr(action, "callable", None)
+                if getattr(fn, "__name__", None) == "_returns":
+                    renpy.show_screen("_neuro_return_screen", action.args[0])
+                    _neuro_ui_buttons = []
+                    continue
+            action()
         renpy.restart_interaction()
+        neuro_unregister_action("click_button")
 
     def _neuro_handle_click_button_action(data):
         success = True
         message = ""
         button_txt = data.get("button")
-        button = next((b for b in _neuro_screen_buttons if _neuro_get_displayable_text(b) == button_txt), None)
+        button = next((b for b in _neuro_ui_buttons if _neuro_get_displayable_text(b) == button_txt), None)
         if button_txt is None:
             success = False
             message = "ERROR: No button selected."
         elif button is None:
             success = False
-            buttons_str = ", ".join([_neuro_get_displayable_text(b) for b in _neuro_screen_buttons])
+            buttons_str = ", ".join([_neuro_get_displayable_text(b) for b in _neuro_ui_buttons])
             message = "ERROR: Button '{}' is not valid. Please select one of the available buttons: {}.".format(button_txt, buttons_str)
         else:
             message = "You clicked the button: {}".format(button_txt)
@@ -537,9 +550,8 @@ init python:
     renpy.exports.input = _neuro_custom_input
     del _neuro_custom_input
 
-    # Overwrite the default show screen function to catch custom menus, modals, etc.
-    _neuro_original_show_screen = renpy.exports.show_screen
-    def _neuro_handle_screen_register_action_and_deadline():
+    # Function to register the click_button action
+    def _neuro_register_click_button_action_and_deadline():
         neuro_register_action(
             "click_button",
             "Click a button on the screen.",
@@ -548,12 +560,21 @@ init python:
                 "properties": {
                     "button": {
                         "type": "string",
-                        "enum": [_neuro_get_displayable_text(button) for button in _neuro_screen_buttons],
+                        "enum": [_neuro_get_displayable_text(button) for button in _neuro_ui_buttons],
                     }
                 },
                 "required": ["button"]
             }
         )
+        _neuro_delayed_function(
+            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
+            neuro_force_action,
+            ["click_button"],
+            "Please click a button using the click_button action.",
+        )
+
+    # Overwrite the default show screen function to catch custom menus, modals, etc.
+    _neuro_original_show_screen = renpy.exports.show_screen
     def _neuro_handle_screen(screen_name):
         try:
             screen = renpy.exports.get_screen(screen_name)
@@ -566,15 +587,15 @@ init python:
                 return
             renpy.log(_neuro_get_displayable_text(screen))
             if neuroconfig.allow_interaction:
-                global _neuro_screen_buttons
-                _neuro_screen_buttons = buttons
+                global _neuro_ui_buttons
+                _neuro_ui_buttons = buttons
                 _neuro_delayed_function(
                     neuroconfig.min_interaction_time,
-                    _neuro_handle_screen_register_action_and_deadline
+                    _neuro_register_click_button_action_and_deadline
                 )
             neuro_give_context(
-                "A {} screen appears with the following content: '{}'".format(screen_name, _neuro_get_displayable_text(screen)) \
-                + (" You must interact with the screen using the actions provided to you." if neuroconfig.allow_interaction else ""),
+                "A {} screen appears with the following content:\n\"{}\"".format(screen_name, _neuro_get_displayable_text(screen)) \
+                + ("\nYou must interact with the screen using the actions provided to you." if neuroconfig.allow_interaction else ""),
                 silent=neuroconfig.silent_choices
             )
         except Exception as e:
@@ -596,16 +617,67 @@ init python:
     renpy.exports.show_screen = _neuro_custom_show_screen
     del _neuro_custom_show_screen
 
+    # Overwrite the default ui.button function to catch buttons created in code
+    _neuro_original_ui_button = renpy.ui.button
+    def _neuro_custom_ui_button(*args, **kwargs):
+        button = _neuro_original_ui_button(*args, **kwargs)
+        if neuroconfig.allow_interaction:
+            global _neuro_ui_buttons
+            try:
+                _neuro_ui_buttons.append(button)
+            except:
+                _neuro_ui_buttons = [button]
+        return button
+    renpy.ui.button = _neuro_custom_ui_button
+    del _neuro_custom_ui_button
+
+    # Overwrite the default ui.textbutton function to catch text buttons created in code
+    _neuro_original_ui_textbutton = renpy.ui.textbutton
+    def _neuro_custom_ui_textbutton(*args, **kwargs):
+        button = renpy.display.behavior.Button(**kwargs)
+        text = renpy.text.text.Text(args[0])
+        button.add(text)
+        if neuroconfig.allow_interaction:
+            global _neuro_ui_buttons
+            try:
+                _neuro_ui_buttons.append(button)
+            except:
+                _neuro_ui_buttons = [button]
+        return _neuro_original_ui_textbutton(*args, **kwargs)
+    renpy.ui.textbutton = _neuro_custom_ui_textbutton
+    del _neuro_custom_ui_textbutton
+
+    # Overwrite the default ui.imagebutton function to catch image buttons created in code
+    _neuro_original_ui_imagebutton = renpy.ui.imagebutton
+    def _neuro_custom_ui_imagebutton(*args, **kwargs):
+        button = _neuro_original_ui_imagebutton(*args, **kwargs)
+        if neuroconfig.allow_interaction:
+            global _neuro_ui_buttons
+            try:
+                _neuro_ui_buttons.append(button)
+            except:
+                _neuro_ui_buttons = [button]
+        return button
+    renpy.ui.imagebutton = _neuro_custom_ui_imagebutton
+    del _neuro_custom_ui_imagebutton
+
     # Overwrite the default ui.interact function to catch whenever the game expects user interaction
-    # _neuro_original_ui_interact = renpy.ui.interact
-    # def _neuro_custom_ui_interact(*args, **kwargs):
-    #     _neuro_original_ui_interact(*args, **kwargs)
-    #     for screen in DEFAULT_RENPY_SCREENS:
-    #         if renpy.get_screen(screen):
-    #             return
-    #     renpy.notify("Non-default screen")
-    # renpy.ui.interact = _neuro_custom_ui_interact
-    # del _neuro_custom_ui_interact
+    _neuro_original_ui_interact = renpy.ui.interact
+    def _neuro_custom_ui_interact(*args, **kwargs):
+        global _neuro_ui_buttons
+        if '_neuro_ui_buttons' in globals() and len(_neuro_ui_buttons) > 0:
+            # There are buttons available to interact with
+            neuro_unregister_action("progress_dialogue")
+            if neuroconfig.allow_interaction:
+                _neuro_delayed_function(
+                    neuroconfig.min_interaction_time,
+                    _neuro_register_click_button_action_and_deadline
+                )
+        rv = _neuro_original_ui_interact(*args, **kwargs)
+        neuro_unregister_action("click_button")
+        return rv
+    renpy.ui.interact = _neuro_custom_ui_interact
+    del _neuro_custom_ui_interact
 
 
 screen _neuro_delayed_function_screen(delay, function, args, kwargs):
