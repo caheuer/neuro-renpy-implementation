@@ -188,12 +188,16 @@ init python:
 
     def neuro_force_action(action_names, query):
         renpy.log("[NEURO] Forcing actions: {}".format(action_names))
+        filtered_action_names = filter(lambda name: any(action["name"] == name for action in _neuro_registered_actions), action_names)
+        if len(filtered_action_names) == 0:
+            renpy.log("[NEURO] None of the specified actions are registered, skipping force action.")
+            return
         msg = {
             "command": "actions/force",
             "game": _neuro_get_game_name(),
             "data": {
                 "query": query,
-                "action_names": action_names
+                "action_names": list(filtered_action_names)
             }
         }
         _neuro_send_ws_message(json.dumps(msg))
@@ -201,6 +205,11 @@ init python:
     def _neuro_handle_progress_dialogue_action(data):
         renpy.exports.queue_event("dismiss")
         return (True, "Progressing dialogue.")
+
+    def _neuro_handle_skip_action(data):
+        renpy.run(Skip())
+        neuro_unregister_action("skip")
+        return (True, "Skipping dialogue.")
 
     def _neuro_handle_continue_action(data):
         renpy.exports.queue_event("dismiss")
@@ -284,6 +293,7 @@ init python:
 
     neuro_action_handlers = {
         "progress_dialogue": _neuro_handle_progress_dialogue_action,
+        "skip": _neuro_handle_skip_action,
         "continue": _neuro_handle_continue_action,
         "select_option": _neuro_handle_select_option_action,
         "input": _neuro_handle_input_action,
@@ -408,7 +418,7 @@ init python:
         _neuro_delayed_function(
             neuroconfig.max_progression_time - neuroconfig.min_progression_time,
             neuro_force_action,
-            ["progress_dialogue"],
+            ["progress_dialogue"] + (["skip"] if Skip().get_sensitive() else []),
             "Please progress the dialogue using the progress_dialogue action.",
         )
 
@@ -550,16 +560,28 @@ init python:
     _neuro_original_say = renpy.exports.say
     def _neuro_custom_say(who, what, interact=True, *args, **kwargs):
         renpy.hide_screen("_neuro_delayed_function_screen")
+        renpy.hide_screen("_neuro_delayed_function_screen_2")
 
         _neuro_save()
 
         neuro_unregister_action("progress_dialogue")
+        neuro_unregister_action("skip")
         neuro_unregister_action("continue")
         neuro_unregister_action("select_option")
         neuro_unregister_action("click_button")
+        neuro_unregister_action("input")
 
         neuro_give_context(_neuro_who_to_str(who) + ": " + renpy.exports.substitute(what), silent=neuroconfig.silent_dialogue)
 
+        # Allow skipping
+        if neuroconfig.allow_interaction and Skip().get_sensitive():
+            neuro_register_action(
+                "skip",
+                "You have already seen this dialogue, you can skip it using this action.",
+                {}
+            )
+
+        # Progression
         if neuroconfig.progression_mode == "action":
             _neuro_delayed_function(
                 neuroconfig.min_progression_time,
@@ -583,6 +605,7 @@ init python:
         _neuro_menu_choices = items
 
         neuro_unregister_action("progress_dialogue")
+        neuro_unregister_action("skip")
 
         if neuroconfig.allow_interaction:
             _neuro_delayed_function(
@@ -605,7 +628,15 @@ init python:
     # Overwrite the default input function
     _neuro_original_input = renpy.exports.input
     def _neuro_custom_input(prompt, default=None, *args, **kwargs):
+        renpy.hide_screen("_neuro_delayed_function_screen")
+        renpy.hide_screen("_neuro_delayed_function_screen_2")
+
         neuro_unregister_action("progress_dialogue")
+        neuro_unregister_action("skip")
+        neuro_unregister_action("continue")
+        neuro_unregister_action("select_option")
+        neuro_unregister_action("click_button")
+        neuro_unregister_action("input")
 
         if neuroconfig.allow_interaction:
             _neuro_delayed_function(
@@ -658,6 +689,7 @@ init python:
             return
 
         neuro_unregister_action("progress_dialogue")
+        neuro_unregister_action("skip")
 
         _neuro_delayed_function(
             0.1,
@@ -717,7 +749,10 @@ init python:
         global _neuro_ui_buttons
         if '_neuro_ui_buttons' in globals() and len(_neuro_ui_buttons) > 0:
             # There are buttons available to interact with
+            renpy.hide_screen("_neuro_delayed_function_screen")
+            renpy.hide_screen("_neuro_delayed_function_screen_2")
             neuro_unregister_action("progress_dialogue")
+            neuro_unregister_action("skip")
             if neuroconfig.allow_interaction:
                 _neuro_delayed_function(
                     neuroconfig.min_interaction_time,
@@ -725,7 +760,10 @@ init python:
                 )
         elif "type" in kwargs and kwargs["type"] == "pause" and store._neuro_game_started:
             # The game is paused, allow continuing
+            renpy.hide_screen("_neuro_delayed_function_screen")
+            renpy.hide_screen("_neuro_delayed_function_screen_2")
             neuro_unregister_action("progress_dialogue")
+            neuro_unregister_action("skip")
             if neuroconfig.allow_interaction:
                 _neuro_delayed_function(
                     neuroconfig.min_interaction_time,
