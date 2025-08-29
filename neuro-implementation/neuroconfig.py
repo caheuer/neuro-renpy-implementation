@@ -28,7 +28,7 @@ silent_choices = False
 
 # How progression to the next dialogue line should occur
 # Options: "action" (sends an action "progress_dialogue" to the Neuro API), "auto" (time-based), "none" (user must click to progress)
-progression_mode = "action"
+progression_mode = "auto"
 # At a minimum, how long should it take before the Neuro API can progress to the next dialogue line (in seconds)
 # This has no effect if progression_mode is set to "auto" or "none"
 min_progression_time = 2.0
@@ -41,5 +41,4 @@ allow_interaction = True
 # At a minimum, how long should it take before the Neuro API can interact on screens such as the choices menu (in seconds)
 min_interaction_time = 5.0
 # At a maximum, how long should it take before an interaction action is forced (in seconds)
-# (Does currently only work for the choices menu)
 max_interaction_time = 60.0

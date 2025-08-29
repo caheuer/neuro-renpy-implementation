@@ -41,5 +41,4 @@ allow_interaction = False
 # At a minimum, how long should it take before the Neuro API can interact on screens such as the choices menu (in seconds)
 min_interaction_time = 5.0
 # At a maximum, how long should it take before an interaction action is forced (in seconds)
-# (Does currently only work for the choices menu)
 max_interaction_time = 60.0
