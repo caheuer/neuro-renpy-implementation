@@ -52,7 +52,15 @@ init python:
             return _neuro_game_name
 
     def _neuro_delayed_function(delay, function, *args, **kwargs):
-        renpy.show_screen("_neuro_delayed_function_screen", delay, function, args, kwargs)
+        # We use two different screens to allow multiple delayed functions to be scheduled at the same time
+        global _neuro_use_alt_delayed_function_screen
+        if "_neuro_use_alt_delayed_function_screen" not in globals():
+            _neuro_use_alt_delayed_function_screen = False
+        if _neuro_use_alt_delayed_function_screen:
+            renpy.show_screen("_neuro_delayed_function_screen_2", delay, function, args, kwargs)
+        else:
+            renpy.show_screen("_neuro_delayed_function_screen", delay, function, args, kwargs)
+        _neuro_use_alt_delayed_function_screen = not _neuro_use_alt_delayed_function_screen
 
     def _neuro_find_buttons_in_displayble(displayable):
         results = []
@@ -194,6 +202,10 @@ init python:
         renpy.exports.queue_event("dismiss")
         return (True, "Progressing dialogue.")
 
+    def _neuro_handle_continue_action(data):
+        renpy.exports.queue_event("dismiss")
+        return (True, "Continuing the game.")
+
     def _neuro_handle_select_option_action(data):
         success = True
         message = ""
@@ -236,14 +248,12 @@ init python:
         if not isinstance(actions, (list, tuple)):
             actions = [actions]
         for action in actions:
-            neuro_give_context(str(action))
             if action.__class__.__name__ == "Return":
                 value = getattr(action, "value", None)
                 renpy.show_screen("_neuro_return_screen", value)
                 _neuro_ui_buttons = []
                 continue
             if action.__class__.__name__ == "Curry":
-                neuro_give_context("Curry action detected.")
                 fn = getattr(action, "callable", None)
                 if getattr(fn, "__name__", None) == "_returns":
                     renpy.show_screen("_neuro_return_screen", action.args[0])
@@ -274,6 +284,7 @@ init python:
 
     neuro_action_handlers = {
         "progress_dialogue": _neuro_handle_progress_dialogue_action,
+        "continue": _neuro_handle_continue_action,
         "select_option": _neuro_handle_select_option_action,
         "input": _neuro_handle_input_action,
         "click_button": _neuro_handle_click_button_action
@@ -385,6 +396,107 @@ init python:
     renpy.invoke_in_thread(_neuro_ws_run)
 
 
+    ### REGISTER ACTION AND TIMEOUT FUNCTIONS ###
+
+    # Function to register the progress_dialogue action
+    def _neuro_register_progress_dialogue_action_and_deadline():
+        neuro_register_action(
+            "progress_dialogue",
+            "Progress the dialogue.",
+            {}
+        )
+        _neuro_delayed_function(
+            neuroconfig.max_progression_time - neuroconfig.min_progression_time,
+            neuro_force_action,
+            ["progress_dialogue"],
+            "Please progress the dialogue using the progress_dialogue action.",
+        )
+
+    # Function to register the continue action
+    def _neuro_register_continue_action_and_deadline():
+        neuro_register_action(
+            "continue",
+            "Continue the game.",
+            {}
+        )
+        _neuro_delayed_function(
+            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
+            neuro_force_action,
+            ["continue"],
+            "Please continue the game using the continue action.",
+        )
+
+    # Function to register the select_option action
+    def _neuro_register_select_option_action_and_deadline(choices):
+        neuro_register_action(
+            "select_option",
+            "Select an option from the menu.",
+            {
+                "type": "object",
+                "properties": {
+                    "option": {
+                        "type": "string",
+                        "enum": [choice[0] for choice in choices],
+                    }
+                },
+                "required": ["option"]
+            }
+        )
+        _neuro_delayed_function(
+            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
+            neuro_force_action,
+            ["select_option"],
+            "Please select an option using the select_option action.",
+        )
+
+    # Function to register the input action
+    def _neuro_register_input_action_and_deadline(prompt, default=None):
+        neuro_register_action(
+            "input",
+            "Provide input for the prompt: '{}'.".format(prompt) \
+            + (" The default input is '{}'.".format(default) if default else ""),
+            {
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "string",
+                        "description": "Your input for the prompt '{}'.".format(prompt),
+                    }
+                },
+                "required": ["input"]
+            }
+        )
+        _neuro_delayed_function(
+            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
+            neuro_force_action,
+            ["input"],
+            "Please provide input using the input action.",
+        )
+
+    # Function to register the click_button action
+    def _neuro_register_click_button_action_and_deadline():
+        neuro_register_action(
+            "click_button",
+            "Click a button on the screen.",
+            {
+                "type": "object",
+                "properties": {
+                    "button": {
+                        "type": "string",
+                        "enum": [_neuro_get_displayable_text(button) for button in _neuro_ui_buttons],
+                    }
+                },
+                "required": ["button"]
+            }
+        )
+        _neuro_delayed_function(
+            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
+            neuro_force_action,
+            ["click_button"],
+            "Please click a button using the click_button action.",
+        )
+
+
     ### REN'PY OVERWRITES ###
 
     # Register the label callback
@@ -436,24 +548,13 @@ init python:
 
     # Overwrite the default say function
     _neuro_original_say = renpy.exports.say
-    def _neuro_custom_say_register_action_and_deadline():
-        neuro_register_action(
-            "progress_dialogue",
-            "Progress the dialogue.",
-            {}
-        )
-        _neuro_delayed_function(
-            neuroconfig.max_progression_time - neuroconfig.min_progression_time,
-            neuro_force_action,
-            ["progress_dialogue"],
-            "Please progress the dialogue using the progress_dialogue action.",
-        )
     def _neuro_custom_say(who, what, interact=True, *args, **kwargs):
         renpy.hide_screen("_neuro_delayed_function_screen")
 
         _neuro_save()
 
         neuro_unregister_action("progress_dialogue")
+        neuro_unregister_action("continue")
         neuro_unregister_action("select_option")
         neuro_unregister_action("click_button")
 
@@ -462,7 +563,7 @@ init python:
         if neuroconfig.progression_mode == "action":
             _neuro_delayed_function(
                 neuroconfig.min_progression_time,
-                _neuro_custom_say_register_action_and_deadline
+                _neuro_register_progress_dialogue_action_and_deadline
             )
         elif neuroconfig.progression_mode == "auto":
             _neuro_delayed_function(
@@ -477,27 +578,6 @@ init python:
 
     # Overwrite the default menu function
     _neuro_original_menu = renpy.exports.menu
-    def _neuro_custom_menu_register_action_and_deadline(choices):
-        neuro_register_action(
-            "select_option",
-            "Select an option from the menu.",
-            {
-                "type": "object",
-                "properties": {
-                    "option": {
-                        "type": "string",
-                        "enum": [choice[0] for choice in choices],
-                    }
-                },
-                "required": ["option"]
-            }
-        )
-        _neuro_delayed_function(
-            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
-            neuro_force_action,
-            ["select_option"],
-            "Please select an option using the select_option action.",
-        )
     def _neuro_custom_menu(items, *args, **kwargs):
         global _neuro_menu_choices
         _neuro_menu_choices = items
@@ -507,7 +587,7 @@ init python:
         if neuroconfig.allow_interaction:
             _neuro_delayed_function(
                 neuroconfig.min_interaction_time,
-                _neuro_custom_menu_register_action_and_deadline,
+                _neuro_register_select_option_action_and_deadline,
                 _neuro_menu_choices
             )
 
@@ -524,35 +604,13 @@ init python:
 
     # Overwrite the default input function
     _neuro_original_input = renpy.exports.input
-    def _neuro_custom_input_register_action_and_deadline(prompt, default=None):
-        neuro_register_action(
-            "input",
-            "Provide input for the prompt: '{}'.".format(prompt) \
-            + (" The default input is '{}'.".format(default) if default else ""),
-            {
-                "type": "object",
-                "properties": {
-                    "input": {
-                        "type": "string",
-                        "description": "Your input for the prompt '{}'.".format(prompt),
-                    }
-                },
-                "required": ["input"]
-            }
-        )
-        _neuro_delayed_function(
-            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
-            neuro_force_action,
-            ["input"],
-            "Please provide input using the input action.",
-        )
     def _neuro_custom_input(prompt, default=None, *args, **kwargs):
         neuro_unregister_action("progress_dialogue")
 
         if neuroconfig.allow_interaction:
             _neuro_delayed_function(
                 neuroconfig.min_interaction_time,
-                _neuro_custom_input_register_action_and_deadline,
+                _neuro_register_input_action_and_deadline,
                 prompt,
                 default,
             )
@@ -569,29 +627,6 @@ init python:
     renpy.exports.input = _neuro_custom_input
     del _neuro_custom_input
 
-    # Function to register the click_button action
-    def _neuro_register_click_button_action_and_deadline():
-        neuro_register_action(
-            "click_button",
-            "Click a button on the screen.",
-            {
-                "type": "object",
-                "properties": {
-                    "button": {
-                        "type": "string",
-                        "enum": [_neuro_get_displayable_text(button) for button in _neuro_ui_buttons],
-                    }
-                },
-                "required": ["button"]
-            }
-        )
-        _neuro_delayed_function(
-            neuroconfig.max_interaction_time - neuroconfig.min_interaction_time,
-            neuro_force_action,
-            ["click_button"],
-            "Please click a button using the click_button action.",
-        )
-
     # Overwrite the default show screen function to catch custom menus, modals, etc.
     _neuro_original_show_screen = renpy.exports.show_screen
     def _neuro_handle_screen(screen_name):
@@ -601,11 +636,7 @@ init python:
                 renpy.log("[NEURO] Screen '{}' not found.".format(screen_name))
                 return
             buttons = _neuro_find_buttons_in_displayble(screen)
-            if len(buttons) == 0:
-                renpy.log("[NEURO] No buttons found in screen '{}'.".format(screen_name))
-                return
-            renpy.log(_neuro_get_displayable_text(screen))
-            if neuroconfig.allow_interaction:
+            if neuroconfig.allow_interaction and len(buttons) > 0:
                 global _neuro_ui_buttons
                 _neuro_ui_buttons = buttons
                 _neuro_delayed_function(
@@ -614,7 +645,7 @@ init python:
                 )
             neuro_give_context(
                 "A {} screen appears with the following content:\n\"{}\"".format(screen_name, _neuro_get_displayable_text(screen)) \
-                + ("\nYou must interact with the screen using the actions provided to you." if neuroconfig.allow_interaction else ""),
+                + ("\nYou must interact with the screen using the actions provided to you." if neuroconfig.allow_interaction and len(buttons) > 0 else ""),
                 silent=neuroconfig.silent_choices
             )
         except Exception as e:
@@ -692,6 +723,14 @@ init python:
                     neuroconfig.min_interaction_time,
                     _neuro_register_click_button_action_and_deadline
                 )
+        elif "type" in kwargs and kwargs["type"] == "pause" and store._neuro_game_started:
+            # The game is paused, allow continuing
+            neuro_unregister_action("progress_dialogue")
+            if neuroconfig.allow_interaction:
+                _neuro_delayed_function(
+                    neuroconfig.min_interaction_time,
+                    _neuro_register_continue_action_and_deadline
+                )
         rv = _neuro_original_ui_interact(*args, **kwargs)
         neuro_unregister_action("click_button")
         return rv
@@ -703,6 +742,11 @@ screen _neuro_delayed_function_screen(delay, function, args, kwargs):
     zorder 1000
     modal False
     timer delay action [Hide("_neuro_delayed_function_screen"), Function(function, *args, **kwargs)]
+
+screen _neuro_delayed_function_screen_2(delay, function, args, kwargs):
+    zorder 1000
+    modal False
+    timer delay action [Hide("_neuro_delayed_function_screen_2"), Function(function, *args, **kwargs)]
 
 screen _neuro_return_screen(value):
     zorder 1000
