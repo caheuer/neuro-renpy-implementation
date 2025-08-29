@@ -571,7 +571,8 @@ init python:
         neuro_unregister_action("click_button")
         neuro_unregister_action("input")
 
-        neuro_give_context(_neuro_who_to_str(who) + ": " + renpy.exports.substitute(what), silent=neuroconfig.silent_dialogue)
+        if not renpy.config.skipping:
+            neuro_give_context(_neuro_who_to_str(who) + ": " + renpy.exports.substitute(what), silent=neuroconfig.silent_dialogue)
 
         # Allow skipping
         if neuroconfig.allow_interaction and Skip().get_sensitive():
