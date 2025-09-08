@@ -3,12 +3,15 @@
 # The WebSocket URL for the Neuro API
 ws_url = "ws://localhost:8000"
 # If the game should start automatically
-# If set to true, the game will start with the last saved state or start a new game if no save was found
+# If set to true, the game will start with the last saved state (if save_game is set to true) or start a new game if no save was found
 auto_start = True
 # How the mod should react once the game is over
 # Options: "new_game" (starts a new game automatically), "close" (closes the game window), "none" (stays on the game over screen)
 # "new_game" is recommended for games which have different paths to explore or games whose story continues after a game over such as DDLC
 game_over_action = "new_game"
+# Whether or not to save the game automatically
+# This also affects whether an auto-started game will load the last saved state
+save_game = True
 # Whether to save the game log
 # If set to true, the game log will be saved to a file named "neuro_log.txt"
 # Use this to debug the Neuro API interactions
