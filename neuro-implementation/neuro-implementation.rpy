@@ -54,18 +54,20 @@ init python:
             return _neuro_game_name
 
     def _neuro_delayed_function(delay, function, *args, **kwargs):
-        # We use two different screens to allow multiple delayed functions to be scheduled at the same time
+        # We use five different screens to allow multiple delayed functions to be scheduled at the same time
         global _neuro_delayed_function_screen_num
         if "_neuro_delayed_function_screen_num" not in globals():
             _neuro_delayed_function_screen_num = 0
         screen_name = "_neuro_delayed_function_screen" if _neuro_delayed_function_screen_num == 0 else ("_neuro_delayed_function_screen_" + str(_neuro_delayed_function_screen_num + 1))
         renpy.show_screen(screen_name, delay, function, args, kwargs)
-        _neuro_delayed_function_screen_num = (_neuro_delayed_function_screen_num + 1) % 3
+        _neuro_delayed_function_screen_num = (_neuro_delayed_function_screen_num + 1) % 5
 
     def _neuro_cancel_delayed_functions():
         renpy.hide_screen("_neuro_delayed_function_screen")
         renpy.hide_screen("_neuro_delayed_function_screen_2")
         renpy.hide_screen("_neuro_delayed_function_screen_3")
+        renpy.hide_screen("_neuro_delayed_function_screen_4")
+        renpy.hide_screen("_neuro_delayed_function_screen_5")
 
     def _neuro_clean_str(s):
         s = renpy.exports.substitute(s) # Translations and variables
@@ -205,7 +207,7 @@ init python:
 
     def neuro_force_action(action_names, query):
         renpy.log("[NEURO] Forcing actions: {}".format(action_names))
-        filtered_action_names = filter(lambda name: any(action["name"] == name for action in _neuro_registered_actions), action_names)
+        filtered_action_names = list(filter(lambda name: any(action["name"] == name for action in _neuro_registered_actions), action_names))
         if len(filtered_action_names) == 0:
             renpy.log("[NEURO] None of the specified actions are registered, skipping force action.")
             return
@@ -585,7 +587,7 @@ init python:
     def _neuro_custom_say(who, what, interact=True, *args, **kwargs):
         _neuro_cancel_delayed_functions()
 
-        if not renpy.config.skipping:
+        if not renpy.config.skipping and what:
             _neuro_save()
 
             neuro_unregister_action("progress_dialogue")
@@ -635,7 +637,7 @@ init python:
     _neuro_original_menu = renpy.exports.menu
     def _neuro_custom_menu(items, *args, **kwargs):
         global _neuro_menu_choices
-        _neuro_menu_choices = filter(lambda choice: r.python.py_eval(choice[1]), items)
+        _neuro_menu_choices = list(filter(lambda choice: r.python.py_eval(choice[1]), items))
 
         neuro_unregister_action("progress_dialogue")
         neuro_unregister_action("skip")
@@ -792,7 +794,7 @@ init python:
                     neuroconfig.min_interaction_time,
                     _neuro_register_click_button_action_and_deadline
                 )
-        elif "type" in kwargs and kwargs["type"] == "pause" and _neuro_game_started:
+        elif "type" in kwargs and kwargs["type"] == "pause":
             # The game is paused, allow continuing
             _neuro_cancel_delayed_functions()
             neuro_unregister_action("progress_dialogue")
@@ -824,6 +826,16 @@ screen _neuro_delayed_function_screen_3(delay, function, args, kwargs):
     zorder 1002
     modal False
     timer delay action [Hide("_neuro_delayed_function_screen_3"), Function(function, *args, **kwargs)]
+
+screen _neuro_delayed_function_screen_4(delay, function, args, kwargs):
+    zorder 1003
+    modal False
+    timer delay action [Hide("_neuro_delayed_function_screen_4"), Function(function, *args, **kwargs)]
+
+screen _neuro_delayed_function_screen_5(delay, function, args, kwargs):
+    zorder 1004
+    modal False
+    timer delay action [Hide("_neuro_delayed_function_screen_5"), Function(function, *args, **kwargs)]
 
 screen _neuro_return_screen(value):
     zorder 1000
