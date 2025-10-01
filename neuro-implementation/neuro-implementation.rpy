@@ -122,7 +122,7 @@ init python:
             return
         renpy.log("[NEURO] Saving the game...")
         try:
-            renpy.save("neuro_save")
+            renpy.save("neuro-1")
         except Exception as e:
             renpy.log("[NEURO] Failed to save the game: {}".format(str(e)))
 
