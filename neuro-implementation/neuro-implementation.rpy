@@ -59,6 +59,8 @@ init python:
             return _neuro_game_name
 
     def _neuro_delayed_function(delay, function, *args, **kwargs):
+        # Delay cannot be less than or equal to zero
+        delay = 0.1 if delay <= 0.0 else delay
         # We use five different screens to allow multiple delayed functions to be scheduled at the same time
         global _neuro_delayed_function_screen_num
         if "_neuro_delayed_function_screen_num" not in globals():
@@ -659,7 +661,7 @@ init python:
             silent=neuroconfig.silent_choices)
         
         rv = _neuro_original_menu(items, *args, **kwargs)
-        neuro_unregister_all_actions()
+        neuro_unregister_action("select_option")
 
         return rv
     renpy.exports.menu = _neuro_custom_menu
@@ -693,7 +695,7 @@ init python:
             silent=neuroconfig.silent_choices)
 
         rv = _neuro_original_input(prompt, default, *args, **kwargs)
-        neuro_unregister_all_actions()
+        neuro_unregister_action("input")
 
         return rv
     renpy.exports.input = _neuro_custom_input
