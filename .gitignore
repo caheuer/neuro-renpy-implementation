@@ -1,2 +1,13 @@
 .vscode/
 test/
+
+# Ren'Py project
+log.txt
+traceback.txt
+errors.txt
+saves/
+*.rpyc
+*.rpyb
+*.rpymc
+*.pyc
+*.pyo
