@@ -3,15 +3,15 @@
 
 This is a universal mod for (almost) all Ren'Py games for AIs to control the game using the [Neuro Game API](https://github.com/VedalAI/neuro-sdk/blob/main/API/SPECIFICATION.md).
 It works for all games written in Ren'Py as long as they only include fairly standard Ren'Py functionalities.
-For more on what functionalities this mod supports, see the Functions and Features section.
-For specific games, see the Games section.
+For more on what functionalities this mod supports, see the [Functions and Features](#functions-and-features) section.
+For specific games, see the [Games](#games) section.
 
-This mod can also be used by developers who want to include Neuro Game API support in their Ren'Py game. For more information, see the For Developers section.
+This mod can also be used by developers who want to include Neuro Game API support in their Ren'Py game. For more information, see the [For Developers](#for-developers) section.
 
 ## Installation and Setup
 1. [Download the mod via GitHub](https://github.com/caheuer/neuro-renpy-implementation/archive/refs/heads/main.zip)
 2. Extract the files using your favorite ZIP file extractor
-3. Copy the **contents** of the `neuro-implementation` into the `game` folder of the Ren'Py game.
+3. Copy the **contents** (not the folder itself!) of the `neuro-implementation` folder into the `game` folder of the Ren'Py game.
 Each Ren'Py game installation will have a `game` folder.
 4. Edit `neuroconfig.py` to configurate the mod to your liking.
 You can open the file with any text file editor, such as Notepad on Windows.
@@ -64,8 +64,8 @@ Do not hesitate to test the mod on other games and note your results there as we
 ## For Developers
 If you are a Ren'Py game developer, you can use this mod to easily add support for the Neuro Game API to your game.
 
-To add this mod to your game, simply add the contents of the `neuro-implentation` folder into the game folder of your project.
-You can find the game folder under Open Directory > game in your Ren'Py launcher.
+To add this mod to your game, simply add the contents of the `neuro-implentation` folder into the `game` folder of your project.
+You can find the `game` folder under `Open Directory > game` in your Ren'Py launcher.
 Then launch the game like you usually do.
 
 When you build your project, the mod should be automatically included.
@@ -95,7 +95,7 @@ It uses the [WebSocket client library for Python version 0.40.0](https://pypi.or
 
 It includes [six.py version 1.17.0](https://pypi.org/project/six/), licensed under the MIT License.
 
-It includes the json module, hmac.py and ssl.py, whoch are part of the [Python 2.7 Standard Library](https://github.com/python/cpython/tree/2.7), licensed under the [Python License](LICENSE.python.txt).
+It includes the json module, hmac.py and ssl.py, which are part of the [Python 2.7 Standard Library](https://github.com/python/cpython/tree/2.7), licensed under the [Python License](LICENSE.python.txt).
 
 All other code and content in this repository is licensed under the [MIT License](LICENSE).
 
