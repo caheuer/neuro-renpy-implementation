@@ -64,7 +64,7 @@ Do not hesitate to test the mod on other games and note your results there as we
 ## For Developers
 If you are a Ren'Py game developer, you can use this mod to easily add support for the Neuro Game API to your game.
 
-To add this mod to your game, simply add the contents of the `neuro-implentation` folder into the `game` folder of your project.
+To add this mod to your game, [download the project from GitHub](https://github.com/caheuer/neuro-renpy-implementation/archive/refs/heads/main.zip) and simply add the contents of the `neuro-implentation` folder into the `game` folder of your project.
 You can find the `game` folder under `Open Directory > game` in your Ren'Py launcher.
 Then launch the game like you usually do.
 
@@ -75,12 +75,12 @@ Web, Android and iOS builds are not be able to connect via websocket.
 Please test if your game runs properly with the implementation before building.
 I recommend using the software [Tony by Pasu4](https://github.com/Pasu4/neuro-api-tony) for this.
 
-Mentioning the mod or me in your game is not neccessary, however if you wish to do so, please attribute "ChrisAusDemKlo" (my Twitch and Discord username).
-
 If you would like to give extra context or provide extra functions via Neuro Game API, you can use the functions described in [FUNCTIONS.md](FUNCTIONS.md).
 
 Check out [the example project](examples/Example%20Game) for a Ren'Py project that uses the Neuro Game API and its extra functions for developers.
 Copy it into your Ren'Py project folder to launch it with the Ren'Py launcher.
+
+Mentioning the mod or me in your game is not neccessary, however if you wish to do so, please attribute "ChrisAusDemKlo" (my Twitch and Discord username).
 
 
 ## Contributing
